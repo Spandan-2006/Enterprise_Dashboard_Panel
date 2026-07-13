@@ -92,7 +92,7 @@ The Logback configuration defines three profiles:
 <springProfile name="staging,prod">
   <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
     <file>/var/log/enterprise-dashboard/app.log</file>
-    <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+    <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
       <!-- Daily rotation -->
       <fileNamePattern>/var/log/enterprise-dashboard/app.%d{yyyy-MM-dd}.log.gz</fileNamePattern>
       <!-- 30-day retention -->

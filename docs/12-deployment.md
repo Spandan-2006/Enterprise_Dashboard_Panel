@@ -73,7 +73,7 @@ At minimum, set `POSTGRES_PASSWORD` and `JWT_SECRET`. See Section 3 for the full
 ### Step 4 — Start all services
 
 ```bash
-docker-compose up --build
+docker compose up --build
 ```
 
 This command:
@@ -87,8 +87,8 @@ This command:
 **To run in the background (detached mode):**
 
 ```bash
-docker-compose up --build -d
-docker-compose logs -f app   # then tail logs separately
+docker compose up --build -d
+docker compose logs -f app   # then tail logs separately
 ```
 
 ### Step 5 — Wait for health checks to pass
@@ -113,7 +113,7 @@ Expected response:
 {"status":"UP"}
 ```
 
-If the status is `DOWN` or `OUT_OF_SERVICE`, check the logs: `docker-compose logs app`.
+If the status is `DOWN` or `OUT_OF_SERVICE`, check the logs: `docker compose logs app`.
 
 ### Step 7 — Open Swagger UI
 
@@ -278,7 +278,7 @@ Never use the `latest` tag in production. Pin to a specific semantic version tag
 image: ghcr.io/spandan-2006/enterprise-dashboard:v1.2.0
 ```
 
-This ensures that a `docker-compose up -d` after an inadvertent `latest` push does not silently upgrade the running application.
+This ensures that a `docker compose up -d` after an inadvertent `latest` push does not silently upgrade the running application.
 
 ### Log Aggregation
 
@@ -293,7 +293,7 @@ Configure a log aggregation solution so that logs persist beyond container resta
 The application is stateless by design (JWT tokens are self-contained, no server-side session state). Multiple application instances can be run behind a load balancer:
 
 ```bash
-docker-compose up --scale app=3
+docker compose up --scale app=3
 ```
 
 Ensure the load balancer has a sticky-session policy disabled — all instances are equivalent and any instance can handle any request.
@@ -308,13 +308,13 @@ To roll back to a previous application version, pull and redeploy the tagged ima
 
 ```bash
 docker pull ghcr.io/spandan-2006/enterprise-dashboard:v1.0.0
-docker-compose up -d
+docker compose up -d
 ```
 
 Update `docker-compose.yml` to reference the specific tag before restarting, or use the `image` override:
 
 ```bash
-IMAGE_TAG=v1.0.0 docker-compose up -d
+IMAGE_TAG=v1.0.0 docker compose up -d
 ```
 
 ### Database Rollback (Flyway)
@@ -322,6 +322,8 @@ IMAGE_TAG=v1.0.0 docker-compose up -d
 Flyway migration files follow the naming convention `V{version}__{description}.sql` (e.g., `V2__add_audit_logs_table.sql`).
 
 **If the schema change has not yet modified data (safe to undo):**
+
+> **Important:** Flyway undo migrations (`V{n}__undo.sql`) require **Flyway Teams or Enterprise edition**. The Community edition (which this project uses) does NOT support undo scripts. Instead, use a forward-fix migration: create a new script `V{n+1}__fix_description.sql` that corrects the schema. For data-only rollbacks, restore from a database backup taken before the deployment.
 
 Run the corresponding undo migration script `V{n}__undo_{description}.sql` to reverse the schema change, then redeploy the previous application version.
 
