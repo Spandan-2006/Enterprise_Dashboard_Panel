@@ -87,9 +87,9 @@ com.enterprise.dashboard
 │   ├── ResourceNotFoundException.java
 │   ├── DuplicateResourceException.java
 │   ├── InvalidStatusTransitionException.java
-│   └── UnauthorizedOperationException.java
+│   ├── UnauthorizedOperationException.java
+│   └── GlobalExceptionHandler.java
 ├── config
-│   ├── GlobalExceptionHandler.java
 │   ├── OpenApiConfig.java
 │   └── ApplicationConfig.java
 └── util
@@ -172,9 +172,9 @@ All endpoints are prefixed with `/api`. All authenticated endpoints require `Aut
 | GET | `/api/deployments/{id}` | Get deployment by ID | ALL |
 | PUT | `/api/deployments/{id}` | Update deployment metadata | ADMIN, DEVOPS_ENGINEER |
 | DELETE | `/api/deployments/{id}` | Delete deployment | ADMIN |
-| PUT | `/api/deployments/{id}/status` | Advance or fail deployment status | ADMIN, DEVOPS_ENGINEER |
+| PATCH | `/api/deployments/{id}/status` | Advance or fail deployment status | ADMIN, DEVOPS_ENGINEER |
 | POST | `/api/deployments/{id}/rollback` | Trigger rollback (FAILED → ROLLED_BACK) | ADMIN, DEVOPS_ENGINEER |
-| GET | `/api/deployments/{id}/rollback` | Get rollback history for a deployment | ADMIN, DEVOPS_ENGINEER |
+| GET | `/api/deployments/{id}/rollbacks` | Get rollback history for a deployment | ADMIN, DEVOPS_ENGINEER |
 
 #### Dashboard (`/api/dashboard`)
 
@@ -221,7 +221,7 @@ External User
     │
     ├──→ [1. Authentication Process]
     │         Input:  credentials (username + password) OR refresh token
-    │         Output: JWT accessToken (15 min) + refreshToken (7 days)
+    │         Output: JWT accessToken (24 hours) + refreshToken (7 days)
     │         Reads:  users table
     │         Writes: users table (register), audit_logs (login/register events)
     │
@@ -256,7 +256,7 @@ External User
 ```
 Client
   │
-  │  PUT /api/deployments/{id}/status
+  │  PATCH /api/deployments/{id}/status
   │  Body: { "status": "BUILDING" }
   │  Header: Authorization: Bearer <token>
   │
@@ -280,7 +280,7 @@ DeploymentService.updateStatus(id, newStatus)
   │
   ├── DeploymentRepository.save(deployment)
   │
-  ├── AuditService.log(username, DEPLOYMENT_STATUS_CHANGED, description)
+  ├── AuditService.log(username, DEPLOYMENT_STATUS_UPDATED, description)
   │     → AuditLogRepository.save(auditLog)
   │
   └── Return DeploymentResponse DTO
@@ -336,14 +336,14 @@ Client receives updated deployment with new status
 
 | From | To | Who Can Trigger | API Endpoint |
 |---|---|---|---|
-| `PENDING` | `BUILDING` | ADMIN, DEVOPS_ENGINEER | `PUT /api/deployments/{id}/status` |
-| `BUILDING` | `TESTING` | ADMIN, DEVOPS_ENGINEER | `PUT /api/deployments/{id}/status` |
-| `TESTING` | `DEPLOYING` | ADMIN, DEVOPS_ENGINEER | `PUT /api/deployments/{id}/status` |
-| `DEPLOYING` | `SUCCESSFUL` | ADMIN, DEVOPS_ENGINEER | `PUT /api/deployments/{id}/status` |
-| `PENDING` | `FAILED` | ADMIN, DEVOPS_ENGINEER | `PUT /api/deployments/{id}/status` |
-| `BUILDING` | `FAILED` | ADMIN, DEVOPS_ENGINEER | `PUT /api/deployments/{id}/status` |
-| `TESTING` | `FAILED` | ADMIN, DEVOPS_ENGINEER | `PUT /api/deployments/{id}/status` |
-| `DEPLOYING` | `FAILED` | ADMIN, DEVOPS_ENGINEER | `PUT /api/deployments/{id}/status` |
+| `PENDING` | `BUILDING` | ADMIN, DEVOPS_ENGINEER | `PATCH /api/deployments/{id}/status` |
+| `BUILDING` | `TESTING` | ADMIN, DEVOPS_ENGINEER | `PATCH /api/deployments/{id}/status` |
+| `TESTING` | `DEPLOYING` | ADMIN, DEVOPS_ENGINEER | `PATCH /api/deployments/{id}/status` |
+| `DEPLOYING` | `SUCCESSFUL` | ADMIN, DEVOPS_ENGINEER | `PATCH /api/deployments/{id}/status` |
+| `PENDING` | `FAILED` | ADMIN, DEVOPS_ENGINEER | `PATCH /api/deployments/{id}/status` |
+| `BUILDING` | `FAILED` | ADMIN, DEVOPS_ENGINEER | `PATCH /api/deployments/{id}/status` |
+| `TESTING` | `FAILED` | ADMIN, DEVOPS_ENGINEER | `PATCH /api/deployments/{id}/status` |
+| `DEPLOYING` | `FAILED` | ADMIN, DEVOPS_ENGINEER | `PATCH /api/deployments/{id}/status` |
 | `FAILED` | `ROLLED_BACK` | ADMIN, DEVOPS_ENGINEER | `POST /api/deployments/{id}/rollback` |
 
 ### Invalid Transitions
@@ -382,7 +382,7 @@ public enum DeploymentStatus {
 
 | Token | Lifetime | Claims | Storage (client-side) |
 |---|---|---|---|
-| Access token | 15 minutes | `sub` (username), `roles`, `iat`, `exp` | Memory / Authorization header |
+| Access token | 24 hours (86400000ms, configurable via JWT_EXPIRY_MS) | `sub` (username), `roles`, `iat`, `exp` | Memory / Authorization header |
 | Refresh token | 7 days | `sub` (username), `iat`, `exp` | Secure HTTP-only cookie or local storage |
 
 ### Login Sequence
@@ -413,7 +413,7 @@ Client                JwtAuthFilter          AuthController          DB
   │←── 200 OK ─────────────────────────────────────│                   │
   │    { accessToken,                              │                   │
   │      refreshToken,                             │                   │
-  │      expiresIn: 900 }                          │                   │
+  │      expiresIn: 86400 }                         │                   │
 ```
 
 ### Authenticated Request Sequence
@@ -479,7 +479,7 @@ Client                JwtAuthFilter          AuthController       DB
 | Signature algorithm | HMAC-SHA256 (HS256) — symmetric; secret shared only within the application |
 | Key source | `JWT_SECRET` environment variable; never hardcoded |
 | Token expiry enforcement | `exp` claim validated by `JwtUtil.validateToken()` on every request |
-| Token revocation (v1) | Not supported — tokens are valid until expiry (acceptable for 15-minute access tokens) |
+| Token revocation (v1) | Not supported — tokens are valid until expiry (acceptable for 24-hour access tokens) |
 | Token revocation (v2) | Redis blacklist: token `jti` stored on logout; `JwtAuthFilter` checks blacklist before trusting token |
 | Claims carried | `sub` (username), `roles` (list), `iat`, `exp` — no sensitive PII in token payload |
 | Refresh token rotation | Out of scope for v1; planned for v2 (issue new refresh token on each refresh, invalidate previous) |

@@ -96,8 +96,8 @@ The architecture is deliberately designed so that horizontal scaling in v2 requi
 │                           ↓                                        │
 │  ┌──────────────────────────────────────────────────────────────┐  │
 │  │                  Repository Layer                             │  │
-│  │  UserRepository  │  DeploymentRepository  │  RollbackRepo    │  │
-│  │                  │  AuditLogRepository    │                  │  │
+│  │  UserRepository  │  DeploymentRepository  │  RollbackRepository  │  │
+│  │                  │  AuditLogRepository    │                      │  │
 │  └────────────────────────┬─────────────────────────────────────┘  │
 └───────────────────────────│─────────────────────────────────────────┘
                             │ JPA / Hibernate
@@ -202,9 +202,9 @@ Events captured:
 | Originating Service | Events |
 |---|---|
 | `AuthService` | `USER_REGISTERED`, `USER_LOGIN`, `USER_LOGOUT`, `TOKEN_REFRESHED` |
-| `DeploymentService` | `DEPLOYMENT_CREATED`, `DEPLOYMENT_UPDATED`, `DEPLOYMENT_STATUS_CHANGED`, `DEPLOYMENT_DELETED` |
+| `DeploymentService` | `DEPLOYMENT_CREATED`, `DEPLOYMENT_UPDATED`, `DEPLOYMENT_STATUS_UPDATED`, `DEPLOYMENT_DELETED` |
 | `RollbackService` | `ROLLBACK_TRIGGERED`, `ROLLBACK_COMPLETED` |
-| `UserService` | `USER_ROLE_UPDATED`, `USER_DELETED` |
+| `UserService` | `USER_ROLE_CHANGED`, `USER_DELETED` |
 
 ### 4.3 Exception Handling
 
@@ -214,7 +214,7 @@ Events captured:
 |---|---|---|
 | `ResourceNotFoundException` | 404 Not Found | Entity not found by ID |
 | `DuplicateResourceException` | 409 Conflict | Username or email already registered |
-| `InvalidStatusTransitionException` | 400 Bad Request | Illegal deployment status transition |
+| `InvalidStatusTransitionException` | 422 Unprocessable Entity | Illegal deployment status transition |
 | `UnauthorizedOperationException` | 403 Forbidden | Business-level permission check failed |
 | `AccessDeniedException` (Spring) | 403 Forbidden | `@PreAuthorize` role check failed |
 | `AuthenticationException` (Spring) | 401 Unauthorized | Invalid or missing JWT |
@@ -282,7 +282,7 @@ The application ships with three profiles, activated via the `SPRING_PROFILES_AC
 
 | Profile | Purpose | Database URL |
 |---|---|---|
-| `dev` | Local development; verbose logging; H2 or local PostgreSQL | `localhost:5432/dashboard_dev` |
+| `dev` | Local development; verbose logging; Local PostgreSQL (via Docker Compose). H2 is reserved for the test profile only. | `localhost:5432/dashboard_dev` |
 | `staging` | Pre-production validation; mirrors prod config | Injected via environment variable |
 | `prod` | Production; minimal logging; strict CORS; SSL enforced | Injected via environment variable |
 
@@ -334,7 +334,7 @@ spring:
 
 jwt:
   secret: ${JWT_SECRET}
-  expiry-ms: ${JWT_EXPIRY_MS:900000}        # 15 minutes
+  expiry-ms: ${JWT_EXPIRY_MS:86400000}       # 24 hours
   refresh-expiry-ms: ${JWT_REFRESH_EXPIRY_MS:604800000}  # 7 days
 
 server:
