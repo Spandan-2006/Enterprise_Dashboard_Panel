@@ -46,7 +46,8 @@ Teams choosing not to build the React frontend can interact with the entire syst
 | Build Tool | Vite | 5.x | Dev server with HMR, production bundler |
 | Styling | Tailwind CSS | 3.x | Utility-first CSS; no custom CSS files unless unavoidable |
 | HTTP Client | Axios | 1.x | API calls; request and response interceptors for auth and error handling |
-| Charts | Chart.js + react-chartjs-2 | 4.x / 5.x | Dashboard doughnut and line charts |
+| Charts | Chart.js | 4.x | Dashboard doughnut and line charts |
+| | react-chartjs-2 | 5.x | React wrapper for Chart.js (installed alongside Chart.js) |
 | Routing | React Router | v6 | Client-side routing; `<Outlet>` for nested layouts |
 | State Management | React Context + `useReducer` | (built-in) | Auth state and global UI state; no Redux in v1 |
 | Form Handling | React controlled components | (built-in) | All forms use controlled inputs; no form library in v1 |
@@ -158,6 +159,9 @@ App (src/App.jsx)
 │                           ├── UserTable (src/components/users/UserTable.jsx)
 │                           ├── RoleSelector (src/components/users/RoleSelector.jsx)
 │                           └── DeleteConfirmDialog (src/components/users/DeleteConfirmDialog.jsx)
+│
+├── ForbiddenPage (src/pages/ForbiddenPage.jsx)  [/forbidden — rendered by response interceptor on 403]
+└── NotFoundPage (src/pages/NotFoundPage.jsx)    [* — catch-all route]
 ```
 
 ### 4.1 Route Guard Implementation

@@ -386,11 +386,13 @@ Lazy fetching (`FetchType.LAZY`) is mandatory here. Loading all `Rollback` entit
 
 | Profile | `spring.jpa.hibernate.ddl-auto` | Schema Management |
 |---|---|---|
-| `local` (developer) | `update` | Hibernate applies incremental schema changes on startup; safe for local iteration |
+| `local` (developer) | `update` | Hibernate applies incremental schema changes on startup; safe for local iteration only — see warning below |
 | `test` | `create-drop` | Schema is created before each test run and dropped after; Flyway is disabled in test profile |
 | `production` | `validate` | Hibernate validates entity mappings against the existing schema; Flyway manages all DDL changes |
 
 **Never use `create` or `create-drop` in production.** `validate` will fail on startup if the database schema does not match the entity mappings, providing an early warning of a missed migration rather than silently dropping production data.
+
+> **Warning:** Do NOT use `update` on a shared or team database — Hibernate's `update` mode can silently drop columns and does not run Flyway migrations. For team environments, use `validate` with Flyway enabled.
 
 ---
 
@@ -508,9 +510,12 @@ INSERT INTO deployments (project_name, version, environment, status, deployed_by
 One rollback is seeded for the `FAILED` `user-api` deployment (deployment ID 3 in the default seed order).
 
 ```sql
--- Rollbacks (references the FAILED user-api deployment, ID = 3 in default seed order)
+-- Rollbacks (references the FAILED user-api deployment, resolved by subquery to avoid hard-coded ID dependency)
 INSERT INTO rollbacks (deployment_id, previous_version, rollback_reason, rollback_time) VALUES
-  (3, '0.9.4', 'Build error in user-api 0.9.5: NullPointerException in UserController line 42', NOW() - INTERVAL '1 hour 40 minutes');
+((SELECT id FROM deployments WHERE project_name = 'user-api' AND version = '0.9.5' LIMIT 1),
+ '0.9.4',
+ 'Build error in user-api 0.9.5: NullPointerException in UserController line 42',
+ NOW() - INTERVAL '1 hour 40 minutes');
 ```
 
 ### 7.4 Audit Logs
