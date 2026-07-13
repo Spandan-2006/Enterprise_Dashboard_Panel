@@ -44,6 +44,8 @@ Controller / Business Logic
 | `allowedHeaders` | `Authorization`, `Content-Type` |
 | `allowCredentials` | `false` |
 
+`allowCredentials` is false because the API uses `Authorization: Bearer` headers (not cookies). Setting this to true would require restricted origins and is not needed for this stateless JWT design.
+
 `CORS_ALLOWED_ORIGINS` must be set in production. In local development it defaults to `http://localhost:3000`.
 
 ---
@@ -229,6 +231,7 @@ auth)                      |
 | **A03 — Injection** | SQL injection or other injection attacks through user-supplied input | JPA parameterized queries only — no native queries with string concatenation; `@Valid` on all request DTOs with Bean Validation annotations |
 | **A04 — Insecure Design** | Business logic flaws baked into the architecture | Business rules enforced in service layer, not controllers; rollback is only permitted on `FAILED` deployments (service-level guard); ADMIN role assignment requires an existing ADMIN to call the role endpoint |
 | **A05 — Security Misconfiguration** | Overly permissive defaults left in place | CORS restricted to `CORS_ALLOWED_ORIGINS`; Swagger UI disabled in production profile (or secured behind auth); Spring Security default security headers enabled; no default passwords |
+| **A06 — Vulnerable and Outdated Components** | Using outdated library versions with known CVEs | Dependency versions pinned in `build.gradle.kts`; OWASP Dependency-Check Gradle plugin runs in CI (`./gradlew dependencyCheckAnalyze`); Dependabot enabled on GitHub repository for automated PR alerts on vulnerable dependencies |
 | **A07 — Identification and Authentication Failures** | Weak authentication mechanisms or poor session management | JWT expiry enforced on every request; BCrypt for password hashing; unique constraint on `username` and `email` columns; short-lived access tokens (24h) + refresh token pattern |
 | **A08 — Software and Data Integrity Failures** | Tampered dependencies or migration scripts | Flyway migrations are immutable — once applied, they must never be modified (checksum validation fails on tamper); Docker images reference specific version tags, not `latest` |
 | **A09 — Security Logging and Monitoring Failures** | Security events not logged, preventing incident detection | All authentication events logged: `LOGIN_SUCCESS`, `LOGIN_FAILURE`; all role changes audited via `AuditService`; `AuditService` uses `@Transactional(propagation = REQUIRES_NEW)` to ensure auth events are persisted even if the outer transaction rolls back |

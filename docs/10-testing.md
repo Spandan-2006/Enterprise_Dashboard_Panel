@@ -355,6 +355,23 @@ User developer = new UserTestBuilder().withRole(Role.DEVELOPER).build();
 
 Similar builders should exist for `DeploymentTestBuilder` and `AuditLogTestBuilder`.
 
+### Test JWT Utility
+
+For security tests that require an expired token, add a test-only helper method to `JwtUtil` or create a `TestJwtUtil` class:
+
+```java
+// In JwtUtil.java (or a test utility class)
+String generateTokenWithExpiry(UserDetails userDetails, Date expiry) {
+    return Jwts.builder()
+        .subject(userDetails.getUsername())
+        .expiration(expiry)  // can be in the past for expired-token tests
+        .signWith(getSignKey())
+        .compact();
+}
+```
+
+Use `new Date(System.currentTimeMillis() - 1000)` as expiry to produce an already-expired token in tests.
+
 ---
 
 ## 8. CI Test Execution
@@ -387,7 +404,12 @@ tasks.jacocoTestCoverageVerification {
     violationRules {
         rule {
             limit {
-                minimum = "0.80".toBigDecimal()  // 80% line coverage required
+                counter = "LINE"
+                minimum = "0.80".toBigDecimal()
+              }
+              limit {
+                counter = "BRANCH"
+                minimum = "0.70".toBigDecimal()
             }
         }
     }
@@ -435,6 +457,7 @@ The following table is the reference for tracking coverage per module. The `Curr
 | DashboardService | 80% | — |
 | AuthController | 85% | — |
 | DeploymentController | 85% | — |
+| UserController | 85% | — |
 | **Overall** | **80%** | **—** |
 
 **Why the targets differ by module:**
