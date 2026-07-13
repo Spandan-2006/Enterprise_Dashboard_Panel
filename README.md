@@ -25,7 +25,7 @@ A full-stack enterprise-grade deployment tracking and management dashboard with 
 | [docs/08-deployment.md](docs/08-deployment.md) | Deployment procedures for dev, staging, and production environments |
 | [docs/09-testing.md](docs/09-testing.md) | Testing strategy, coverage targets, and how to run the test suite |
 | [docs/10-docker.md](docs/10-docker.md) | Docker and Docker Compose setup, image build instructions, and compose profiles |
-| [docs/11-ci-cd.md](docs/11-cd.md) | GitHub Actions pipeline stages, secrets required, and deployment gates |
+| [docs/11-ci-cd.md](docs/11-ci-cd.md) | GitHub Actions pipeline stages, secrets required, and deployment gates |
 | [docs/12-monitoring.md](docs/12-monitoring.md) | Actuator endpoints, logging configuration, and observability setup |
 | [docs/13-rollback.md](docs/13-rollback.md) | Rollback workflow, trigger conditions, and history retention policy |
 | [docs/14-coding-standards.md](docs/14-coding-standards.md) | Java style guide, naming conventions, and code review checklist |
