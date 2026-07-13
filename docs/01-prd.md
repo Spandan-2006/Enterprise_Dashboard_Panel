@@ -32,7 +32,7 @@ The Enterprise Deployment Dashboard is a role-aware backend service (with an opt
 
 - **Real-time deployment lifecycle tracking** across all environments under a unified API
 - **One-click rollback management** with reason capture and full traceability back to the originating deployment
-- **Complete, tamper-evident audit trails** automatically recording every authentication event, deployment change, and privilege escalation
+- **Complete, append-only audit trails** automatically recording every authentication event, deployment change, and privilege escalation
 - **Role-Based Access Control (RBAC)** that enforces the principle of least privilege — Admins manage users and configuration, DevOps Engineers own deployments and rollbacks, Developers have read-only visibility
 
 The result is a single pane of glass that reduces mean-time-to-diagnose deployment incidents, eliminates untracked production changes, and satisfies compliance requirements for auditable operations.
@@ -48,7 +48,7 @@ The result is a single pane of glass that reduces mean-time-to-diagnose deployme
 | G-1 | Track the full lifecycle of every deployment (PENDING → BUILDING → TESTING → DEPLOYING → SUCCESSFUL / FAILED → ROLLED_BACK) across DEV, QA, STAGING, and PRODUCTION environments |
 | G-2 | Enforce Role-Based Access Control (RBAC) with three roles — ADMIN, DEVOPS_ENGINEER, DEVELOPER — ensuring each role can only perform actions appropriate to its responsibility level |
 | G-3 | Enable one-click rollback for any deployment in FAILED status, capturing the rollback reason and previous version for future auditing |
-| G-4 | Provide a complete, immutable audit trail for all authentication events, deployment mutations, and privilege changes |
+| G-4 | Provide a complete, append-only audit trail for all authentication events, deployment mutations, and privilege changes |
 | G-5 | Expose a metrics dashboard endpoint surfacing total, successful, failed, and pending deployment counts along with success rates |
 
 ### Non-Goals (v1 Out of Scope)
@@ -67,7 +67,7 @@ The result is a single pane of glass that reduces mean-time-to-diagnose deployme
 |------|-------------------|----------------------|
 | **Admin** | Manages the system and all users; has full visibility across all data; responsible for compliance and governance | Register new users; assign and update roles; view full audit logs; delete deployments; view dashboard statistics; delete users |
 | **DevOps Engineer** | Owns the deployment lifecycle; ensures software reaches environments safely and reliably | Create new deployments; update deployment status at each pipeline stage; trigger rollbacks for failed deployments; monitor the deployment pipeline |
-| **Developer** | Consumes deployment information to understand what version of their project is running where | View deployment status of their own projects; read-only access to other deployments; view their own audit log entries; filter deployments by environment and status |
+| **Developer** | Consumes deployment information to understand what version of their project is running where | View deployment status of all projects (read-only); view their own audit log entries; filter deployments by environment and status |
 
 ---
 
@@ -169,7 +169,7 @@ Requirements are grouped by feature area. Each requirement is uniquely identifie
 | NFR-004 | Data integrity | All multi-step database operations (e.g., rollback trigger + status update) wrapped in a single `@Transactional` boundary |
 | NFR-005 | Availability | System uptime target of 99.9% in production environment |
 | NFR-006 | Structured error responses | Every error response returns a JSON body with at minimum `success: false`, `message`, and `errors`; raw stack traces must never be exposed to API consumers |
-| NFR-007 | Authentication enforcement | Every endpoint except `/api/auth/login` and `/api/auth/register` must require a valid, non-expired JWT in the `Authorization: Bearer <token>` header |
+| NFR-007 | Authentication enforcement | Every endpoint except `/api/auth/login`, `/api/auth/register`, and `/actuator/health` must require a valid, non-expired JWT in the `Authorization: Bearer <token>` header |
 
 ---
 
@@ -181,6 +181,7 @@ Requirements are grouped by feature area. Each requirement is uniquely identifie
 | **Database** | PostgreSQL 15 or newer only; no other relational or NoSQL databases in v1 |
 | **Messaging** | No external message queue (Kafka, RabbitMQ, SQS) in v1; all operations are synchronous request/response |
 | **Notifications** | No email or push notification system in v1; status visibility is pull-only via the API |
+| **Audit log immutability** | Audit log records are append-only at the application layer. No delete or update operations on `audit_logs` are exposed through the API. |
 
 ---
 
@@ -193,4 +194,4 @@ The following metrics define a successful v1 launch. They are measurable and sho
 | Deployment coverage | 100% of deployments tracked — zero production changes occur outside the dashboard |
 | Incident traceability | Any rollback event is fully traceable (who, what, why, when) within 5 minutes of the incident |
 | Privilege auditability | Zero unaudited privilege escalations — every role change generates an audit log entry |
-| Dashboard load time | The metrics dashboard endpoint responds in under 2 seconds at p95 under normal load |
+| Dashboard load time | Dashboard API endpoint complies with NFR-001 (p95 < 200ms under 100 concurrent users); dashboard page load in browser under 2 seconds (includes frontend rendering time) |

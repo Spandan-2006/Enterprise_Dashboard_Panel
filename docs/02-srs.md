@@ -99,7 +99,7 @@ This section expands the functional requirements from the PRD with precise input
 ### FR-001 — User Registration
 
 **Endpoint:** `POST /api/auth/register`  
-**Access:** Admin only (ADMIN role required)
+**Access:** Open (no authentication required). Admin seeding is handled via the database migration seed data (see docs/07-database.md). Once the system is initialized, user registration is restricted to Admin-invited flow in v2. For v1, registration is open but Admins can delete users.
 
 **Input:**
 ```json
@@ -193,7 +193,7 @@ HTTP 200.
 }
 ```
 
-**Processing Logic:** Validate all required fields are present and non-blank. Set `status = PENDING`. Set `deployedBy = username` extracted from the JWT. Set `startTime = now()`. Leave `endTime = null`. Persist the `Deployment` entity inside a transaction. After successful persistence, write an `AuditLog` entry with `action = DEPLOYMENT_CREATED` and a description including project name, version, and environment.
+**Processing Logic:** Validate all required fields are present and non-blank. Set `status = PENDING`. Set `deployedBy = username` extracted from the JWT. Set `startTime = now()`. Leave `endTime = null`. Within the same `@Transactional` boundary: validate fields, create and persist the `Deployment` entity with `status = PENDING`, create and persist a `DEPLOYMENT_CREATED` `AuditLog` entry with a description including project name, version, and environment. Return `DeploymentResponse`.
 
 **Output:** `DeploymentResponse` DTO, HTTP 201.
 
@@ -233,7 +233,7 @@ HTTP 200.
 ### FR-007 — List Deployments (Paginated)
 
 **Endpoint:** `GET /api/deployments?page=0&size=20&sort=startTime,desc`  
-**Access:** All authenticated roles
+**Access:** All authenticated roles. Returns all deployments (no per-user data scoping in v1).
 
 **Processing Logic:** Apply pagination and sorting parameters from query string. Use Spring Data's `Pageable` abstraction. Return `Page<DeploymentResponse>` wrapped in `ApiResponse`.
 
@@ -257,11 +257,11 @@ HTTP 200.
 **Endpoint:** `DELETE /api/deployments/{id}`  
 **Access:** ADMIN only
 
-**Processing Logic:** Load deployment by ID (404 if not found). Delete the record. Log `DEPLOYMENT_DELETED` to `audit_logs`, capturing the deployment's project name and version in the description.
+**Processing Logic:** Load deployment by ID (404 if not found). Delete the record. Log `DEPLOYMENT_DELETED` to `audit_logs`, capturing the deployment's project name and version in the description. Note: due to the `ON DELETE RESTRICT` constraint on `rollbacks.deployment_id`, an attempt to delete a deployment that has associated rollback records will fail with HTTP 422 and message `"Cannot delete a deployment with existing rollback records"`.
 
 **Output:** HTTP 204 No Content.
 
-**Error Conditions:** 404 if not found; 403 if caller is not ADMIN.
+**Error Conditions:** 404 if not found; 403 if caller is not ADMIN; 422 if the deployment has associated rollback records.
 
 ---
 
@@ -286,7 +286,7 @@ HTTP 200.
 { "rollbackReason": "string (@NotBlank, TEXT)" }
 ```
 
-**Processing Logic:** Load the `Deployment` by `id` from the path variable. If not found, return 404. Verify that `deployment.status == FAILED`; if not, return 422 with message `"Rollback only allowed for deployments in FAILED status"`. Within a single transaction: create a `Rollback` entity with `deploymentId = id`, `previousVersion = deployment.version`, `rollbackReason = request.rollbackReason`, `rollbackTime = now()`. Update `deployment.status = ROLLED_BACK` and `deployment.endTime = now()`. Persist both. After the transaction commits, write `ROLLBACK_TRIGGERED` to `audit_logs` with a description capturing deployment ID and rollback reason.
+**Processing Logic:** Load the `Deployment` by `id` from the path variable. If not found, return 404. Verify that `deployment.status == FAILED`; if not, return 422 with message `"Rollback only allowed for deployments in FAILED status"`. Within a single `@Transactional` boundary: create a `Rollback` entity with `deploymentId = id`, `previousVersion = deployment.version`, `rollbackReason = request.rollbackReason`, `rollbackTime = now()`; update `deployment.status = ROLLED_BACK` and `deployment.endTime = now()`; persist both; write `ROLLBACK_TRIGGERED` to `audit_logs` with a description capturing deployment ID and rollback reason. All three operations (rollback record, status update, and audit log entry) are committed atomically.
 
 **Output:** `RollbackResponse` DTO, HTTP 201.
 
@@ -320,7 +320,7 @@ This requirement is satisfied as part of FR-011's processing logic. The `Rollbac
 
 ### FR-014 — Audit Logging: Authentication Events
 
-This requirement is enforced in the `AuthService`. After every login attempt (success or failure), a service call writes an `AuditLog` row. This must not be conditional on the HTTP response — even a failed authentication attempt must produce an audit record. The `LOGIN_FAILURE` record stores `username` from the request body (regardless of whether the user exists).
+This requirement is enforced in the `AuthService`. After every login attempt (success or failure), a service call writes an `AuditLog` row. This must not be conditional on the HTTP response — even a failed authentication attempt must produce an audit record. The `LOGIN_FAILURE` record stores `username` from the request body regardless of whether the user exists in the system. Logging always occurs to support brute-force detection.
 
 ---
 
@@ -344,7 +344,7 @@ Audit logging for deployment events is handled in the `DeploymentService` and `R
 ### FR-017 — Deployment Statistics
 
 **Endpoint:** `GET /api/dashboard/stats`  
-**Access:** ADMIN (full stats); DEVOPS_ENGINEER and DEVELOPER may access this endpoint with the same response shape
+**Access:** All authenticated roles. All roles receive the same response shape with identical data. No role-based filtering on dashboard statistics in v1.
 
 **Processing Logic:** Execute aggregate count queries grouped by status. Return scalar counts: `total`, `successful`, `failed`, `pending`, `building`, `testing`, `deploying`, `rolledBack`.
 
@@ -432,12 +432,13 @@ HTTP 200, wrapped in `ApiResponse`.
 **Alternate Flow B — User Not Found:**
 
 - Step 3 returns no result.
-- System returns HTTP 401 with the same message `"Invalid username or password"` (no information about whether the username exists is disclosed).
-- Flow ends (no audit log is written for unknown usernames to avoid storing arbitrary input).
+- System returns HTTP 401 with message `"Invalid username or password"` (no information about whether the username exists is disclosed).
+- System logs `LOGIN_FAILURE` to `audit_logs` with the attempted username (logging always occurs to support brute-force detection).
+- Flow ends.
 
 **Postconditions:**
 - On success: the user holds a valid JWT access token usable as a Bearer token on all secured endpoints; a `LOGIN_SUCCESS` record exists in `audit_logs`.
-- On failure: a `LOGIN_FAILURE` record exists in `audit_logs` (for known usernames); no token is issued.
+- On failure: a `LOGIN_FAILURE` record exists in `audit_logs`; no token is issued.
 
 ---
 
@@ -616,6 +617,7 @@ Database table: `deployments`
 
 ```
 PENDING → BUILDING
+PENDING → FAILED      (Admin or DevOps Engineer only; e.g., job never picked up by triggering system)
 BUILDING → TESTING
 BUILDING → FAILED
 TESTING → DEPLOYING
@@ -632,10 +634,12 @@ Database table: `rollbacks`
 | Field | Java Type | DB Column | Constraints | Validation |
 |-------|-----------|-----------|-------------|------------|
 | id | Long | id | PK, auto-generated (IDENTITY) | — |
-| deploymentId | Long | deployment_id | NOT NULL, FK → deployments.id | Set by service |
+| deploymentId | Long | deployment_id | NOT NULL, FK → deployments.id ON DELETE RESTRICT | Set by service |
 | previousVersion | String | previous_version | NOT NULL, max 50 chars | Copied from Deployment.version by service; `@NotBlank` |
 | rollbackReason | String | rollback_reason | NOT NULL, TEXT | `@NotBlank` (user-supplied in request body) |
 | rollbackTime | LocalDateTime | rollback_time | NOT NULL, default `now()` | Set by service |
+
+**Foreign key constraint note:** The `deployment_id` column uses `ON DELETE RESTRICT`. An Admin cannot delete a `Deployment` that has associated `Rollback` records. This preserves audit trail integrity. To remove a deployment with rollback history, the rollback records must be deleted first (Admin only, v2 feature). See FR-009 for how this constraint is surfaced to API consumers.
 
 ### 5.4 Entity: AuditLog
 
@@ -654,7 +658,7 @@ Database table: `audit_logs`
 | Constant | Trigger |
 |----------|---------|
 | `LOGIN_SUCCESS` | Successful authentication |
-| `LOGIN_FAILURE` | Failed authentication attempt (known username) |
+| `LOGIN_FAILURE` | Failed authentication attempt (any username, known or unknown) |
 | `DEPLOYMENT_CREATED` | New deployment record created |
 | `DEPLOYMENT_STATUS_UPDATED` | Deployment status changed |
 | `DEPLOYMENT_DELETED` | Deployment record deleted by Admin |
@@ -676,7 +680,7 @@ Database table: `audit_logs`
 ### 6.2 Authentication
 
 - **Mechanism:** Bearer token in the `Authorization` header: `Authorization: Bearer <accessToken>`
-- **Exclusions:** `POST /api/auth/login` and `POST /api/auth/register` do not require a token
+- **Exclusions:** `POST /api/auth/login`, `POST /api/auth/register`, and `GET /actuator/health` do not require a token
 - **Token rejection:** Expired, malformed, or unsigned tokens return HTTP 401 before the request reaches any controller
 
 ### 6.3 Pagination
