@@ -101,6 +101,8 @@ spring:
       maximum-pool-size: 10
       minimum-idle: 2
       connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
   jpa:
     hibernate:
       ddl-auto: validate
@@ -144,7 +146,7 @@ Used for local development and the shared dev server. Relaxed JPA settings, full
 spring:
   jpa:
     hibernate:
-      ddl-auto: update        # allow schema auto-update during active development
+      ddl-auto: validate        # Flyway manages the schema; Hibernate only validates
     show-sql: true
     properties:
       hibernate:
@@ -161,6 +163,8 @@ logging:
     root: INFO
     com.enterprise.dashboard: DEBUG
 ```
+
+> **Note:** Using `ddl-auto: validate` ensures Hibernate validates the schema against entities without modifying it. Flyway handles all schema changes via migration scripts, even in local development.
 
 ### `application-staging.yml`
 

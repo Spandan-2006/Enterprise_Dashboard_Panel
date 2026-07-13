@@ -154,12 +154,13 @@ axiosInstance.interceptors.response.use(
     const status = error.response?.status;
     const data = error.response?.data;
 
+    // Note: use window.location.href instead of React Router's navigate() for module-level interceptors
     if (status === 401) {
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       window.location.href = '/login';
     } else if (status === 403) {
-      navigate('/forbidden');
+      window.location.href = '/forbidden';
     } else if (status === 422) {
       // Display data.message inline on the form
       setFormError(data.message);
@@ -192,7 +193,7 @@ if (status === 400 && data.errors) {
 | 400 (validation) | Iterate `errors` array; display each `message` inline below the corresponding form field |
 | 400 (other) | Display `data.message` as a form-level error |
 | 401 | Clear localStorage tokens; redirect to `/login` |
-| 403 | Navigate to `/forbidden` |
+| 403 | Redirect to `/forbidden` via `window.location.href` |
 | 404 | Display "Not found" inline or navigate to 404 page |
 | 422 | Display `data.message` as an inline error on the form |
 | 5xx | Display global error toast: `"Server error. Reference: {data.message}"` |

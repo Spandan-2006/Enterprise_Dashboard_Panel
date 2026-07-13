@@ -78,12 +78,21 @@ Page<Deployment> findAll(Specification<Deployment> spec, Pageable pageable);
 // Controller
 @GetMapping
 public ResponseEntity<ApiResponse<Page<DeploymentSummary>>> list(
-    @PageableDefault(size = 20, max = 100) Pageable pageable) {
+    @PageableDefault(size = 20) Pageable pageable) {
     ...
 }
 ```
 
-Maximum page size: **100 records**. The `@PageableDefault` annotation enforces this. Clients requesting `size > 100` receive the capped value, not an error.
+Maximum page size: **100 records**. `@PageableDefault` does not have a `max` attribute — to enforce a maximum page size, configure a `PageableHandlerMethodArgumentResolverCustomizer` bean:
+
+```java
+@Bean
+public PageableHandlerMethodArgumentResolverCustomizer pageableCustomizer() {
+    return p -> p.setMaxPageSize(100);
+}
+```
+
+Clients requesting `size > 100` receive the capped value, not an error.
 
 ---
 
@@ -93,7 +102,6 @@ Set these flags in the container `JAVA_OPTS` environment variable or in the Dock
 
 ```
 -Xms512m              # initial heap — avoids GC pauses on first load
--Xmx1g                # max heap — leave room for OS and non-heap
 -XX:+UseContainerSupport     # respect container memory limits
 -XX:MaxRAMPercentage=75.0    # use 75% of container memory as heap
 -Djava.security.egd=file:/dev/./urandom  # faster secure random for JWT
@@ -102,13 +110,13 @@ Set these flags in the container `JAVA_OPTS` environment variable or in the Dock
 **Notes:**
 - G1GC is the default garbage collector in JDK 21 — no explicit override is needed.
 - `UseContainerSupport` is enabled by default in JDK 11+ but is explicitly included here for clarity.
-- If both `-Xmx` and `-XX:MaxRAMPercentage` are set, the explicit `-Xmx` takes precedence. Use one or the other — `MaxRAMPercentage` is preferred in containerized deployments where container memory limits may vary across environments.
+- Use `-XX:MaxRAMPercentage=75.0` with `-XX:+UseContainerSupport` instead of a hard-coded `-Xmx` when running in a container — this lets the JVM respect the container's memory limit dynamically.
 - The `/dev/./urandom` path notation (with the extra `.`) bypasses the JVM's blocking `/dev/random` fallback check on Linux, preventing JWT signing from stalling under load.
 
 **Dockerfile example:**
 
 ```dockerfile
-ENV JAVA_OPTS="-Xms512m -Xmx1g -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
+ENV JAVA_OPTS="-Xms512m -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
 ```
 
