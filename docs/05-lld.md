@@ -251,11 +251,12 @@ public interface AuthService {
      * subject (username), loads the user, and issues a fresh access token.
      * The refresh token itself is not rotated in v1.
      *
-     * @param refreshToken the JWT refresh token string (without "Bearer " prefix)
+     * @param request {@link RefreshTokenRequest} containing the JWT refresh token string
+     *                (without "Bearer " prefix)
      * @return {@link AuthResponse} containing the new access token and its expiry
      * @throws UnauthorizedException if the refresh token is expired, malformed, or invalid
      */
-    AuthResponse refreshToken(String refreshToken);
+    AuthResponse refreshToken(RefreshTokenRequest request);
 }
 ```
 
@@ -512,8 +513,8 @@ public interface DashboardService {
      *   <li>{@code countByStatus(ROLLED_BACK)}</li>
      *   <li>Total: sum of all statuses (single {@code count()} call)</li>
      * </ul>
-     * Also populates {@code recentDeployments} from {@link #getRecentDeployments(int)}
-     * with a limit of 5.
+     * Also populates {@code recentDeployments} from {@link #getRecentDeployments()}
+     * (returns the 10 most recent deployments).
      *
      * @return {@link DashboardStatsResponse} with all metrics populated
      */
@@ -527,17 +528,18 @@ public interface DashboardService {
      * {@code PENDING} state (i.e., total minus PENDING). Returns {@code 0.0} if
      * {@code totalEvaluated} is zero to avoid division by zero.
      *
-     * @return success rate as a {@code double} in the range [0.0, 100.0]
+     * @return {@link SuccessRateResponse} containing the success rate (0.0–100.0) and
+     *         the count of non-PENDING deployments used in the calculation
      */
-    double getSuccessRate();
+    SuccessRateResponse getSuccessRate();
 
     /**
-     * Returns the most recent deployments ordered by start time descending.
+     * Returns the 10 most recent deployments ordered by start time descending.
      *
-     * @param limit maximum number of results to return (typically 5 or 10)
-     * @return list of {@link DeploymentResponse}, length at most {@code limit}
+     * @return list of the 10 most recent {@link DeploymentResponse} objects,
+     *         ordered by {@code startTime} descending
      */
-    List<DeploymentResponse> getRecentDeployments(int limit);
+    List<DeploymentResponse> getRecentDeployments();
 }
 ```
 
@@ -571,6 +573,8 @@ public class RegisterRequest {
     private Role role;
 }
 ```
+
+**Security note:** The `role` field accepts any Role enum value. However, the service layer enforces that ADMIN role can only be assigned by an existing ADMIN (i.e., `AuthService.register()` throws `ForbiddenException` if the request role is `ADMIN` and the caller is not already an ADMIN). For the first admin, use the database seed data (see docs/07-database.md).
 
 #### LoginRequest
 
@@ -638,6 +642,15 @@ public class UpdateRoleRequest {
 }
 ```
 
+#### RefreshTokenRequest
+
+```java
+public class RefreshTokenRequest {
+    @NotBlank
+    private String refreshToken;
+}
+```
+
 #### DeploymentFilterRequest (query params — no validation annotations)
 
 ```java
@@ -656,10 +669,16 @@ public class DeploymentFilterRequest {
 public class AuditLogFilterRequest {
     private String username;           // nullable — exact match
     private String action;             // nullable — exact match
+
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
     private LocalDateTime startDate;   // nullable — inclusive lower bound on timestamp
+
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
     private LocalDateTime endDate;     // nullable — inclusive upper bound on timestamp
 }
 ```
+
+**Note:** Spring MVC requires `@DateTimeFormat` for `LocalDateTime` query parameters to correctly parse ISO-8601 datetime strings (e.g. `2026-07-01T00:00:00`) passed in query strings.
 
 ---
 
@@ -734,6 +753,15 @@ public class DashboardStatsResponse {
     private long rolledBackDeployments;
     private double successRate;                       // 0.0 to 100.0
     private List<DeploymentResponse> recentDeployments; // last 5
+}
+```
+
+#### SuccessRateResponse
+
+```java
+public class SuccessRateResponse {
+    private double successRate;     // percentage 0.0–100.0
+    private long totalEvaluated;    // count of non-PENDING deployments used in calculation
 }
 ```
 
@@ -831,13 +859,13 @@ public interface DeploymentRepository
 
     /**
      * Returns the 5 most recent deployments ordered by start time descending.
-     * Used by DashboardService.getStats() and DashboardService.getRecentDeployments(5).
+     * Used by DashboardService.getStats() to populate the recentDeployments summary.
      */
     List<Deployment> findTop5ByOrderByStartTimeDesc();
 
     /**
-     * Returns the N most recent deployments for the /dashboard/recent endpoint.
-     * Spring Data derives the query; the controller passes limit=10.
+     * Returns the 10 most recent deployments ordered by start time descending.
+     * Used by DashboardService.getRecentDeployments() for the /dashboard/recent endpoint.
      */
     List<Deployment> findTop10ByOrderByStartTimeDesc();
 
@@ -1073,6 +1101,8 @@ public class GlobalExceptionHandler {
 | `LOGIN_SUCCESS` | User authenticated successfully | `AuthService.login()` — called after JWT generation |
 | `LOGIN_FAILURE` | Authentication attempt failed | `AuthService.login()` — called before throwing `UnauthorizedException` |
 | `USER_REGISTERED` | New user account created | `AuthService.register()` — called after user persisted |
+
+> **Important:** AUTH audit logging (`LOGIN_SUCCESS`, `LOGIN_FAILURE`) must use `REQUIRES_NEW` propagation or be written outside the main transaction to ensure auth events are never lost to rollback. Recommended: use `@Transactional(propagation = Propagation.REQUIRES_NEW)` on `AuditService.log()` calls from `AuthService`.
 | `DEPLOYMENT_CREATED` | New deployment record created | `DeploymentService.createDeployment()` — called after entity saved |
 | `DEPLOYMENT_UPDATED` | Deployment remarks updated | `DeploymentService.updateDeployment()` — called after field update saved |
 | `DEPLOYMENT_STATUS_UPDATED` | Deployment status transitioned | `DeploymentService.updateStatus()` — description includes `{from} → {to}` |

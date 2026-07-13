@@ -71,6 +71,8 @@ Authorization: Bearer <accessToken>
 - `POST /api/auth/login`
 - `POST /api/auth/refresh`
 
+> **Note:** Rate limiting and account lockout are not implemented in v1 backend. These should be enforced at the API gateway or reverse proxy layer in production deployments.
+
 ---
 
 ## 3. Standard Response Envelope
@@ -82,7 +84,7 @@ Every response from the API is wrapped in `ApiResponse<T>`:
   "success": true,
   "message": "Operation successful",
   "data": { },
-  "timestamp": "2025-07-13T10:30:00Z",
+  "timestamp": "2026-07-13T10:30:00Z",
   "errors": null
 }
 ```
@@ -102,7 +104,7 @@ Every response from the API is wrapped in `ApiResponse<T>`:
   "success": false,
   "message": "Validation failed",
   "data": null,
-  "timestamp": "2025-07-13T10:30:00Z",
+  "timestamp": "2026-07-13T10:30:00Z",
   "errors": [
     { "field": "projectName", "message": "must not be blank" },
     { "field": "version",     "message": "must not be blank" }
@@ -117,7 +119,7 @@ For non-field errors (e.g., 404, 409, 500), `errors` is `null` and the `message`
   "success": false,
   "message": "Resource not found: Deployment with id 42",
   "data": null,
-  "timestamp": "2025-07-13T10:30:00Z",
+  "timestamp": "2026-07-13T10:30:00Z",
   "errors": null
 }
 ```
@@ -154,7 +156,7 @@ Paginated data is returned inside the `data` field of the standard envelope:
     "totalPages": 8,
     "last": false
   },
-  "timestamp": "2025-07-13T10:30:00Z",
+  "timestamp": "2026-07-13T10:30:00Z",
   "errors": null
 }
 ```
@@ -181,6 +183,8 @@ Paginated data is returned inside the `data` field of the standard envelope:
 #### POST /api/auth/register
 
 **Description:** Register a new user account. Issues JWT tokens immediately on successful registration so the client can proceed without a separate login step.
+
+**Note:** Registering with role `ADMIN` requires an existing ADMIN token in the `Authorization` header. Open registration allows `DEVELOPER` and `DEVOPS_ENGINEER` roles only.
 
 **Authentication required:** None
 
@@ -218,7 +222,7 @@ Paginated data is returned inside the `data` field of the standard envelope:
     "username": "devops1",
     "role": "DEVOPS_ENGINEER"
   },
-  "timestamp": "2025-07-13T10:30:00Z",
+  "timestamp": "2026-07-13T10:30:00Z",
   "errors": null
 }
 ```
@@ -268,7 +272,7 @@ Paginated data is returned inside the `data` field of the standard envelope:
     "username": "admin",
     "role": "ADMIN"
   },
-  "timestamp": "2025-07-13T10:30:00Z",
+  "timestamp": "2026-07-13T10:30:00Z",
   "errors": null
 }
 ```
@@ -316,7 +320,7 @@ Paginated data is returned inside the `data` field of the standard envelope:
     "username": "admin",
     "role": "ADMIN"
   },
-  "timestamp": "2025-07-13T10:48:00Z",
+  "timestamp": "2026-07-13T10:48:00Z",
   "errors": null
 }
 ```
@@ -378,8 +382,8 @@ Authorization: Bearer eyJhbGci...
         "environment": "STAGING",
         "status": "SUCCESSFUL",
         "deployedBy": "devops1",
-        "startTime": "2025-07-13T08:00:00Z",
-        "endTime": "2025-07-13T08:14:37Z",
+        "startTime": "2026-07-13T08:00:00Z",
+        "endTime": "2026-07-13T08:14:37Z",
         "remarks": "Release candidate",
         "durationSeconds": 877
       },
@@ -390,8 +394,8 @@ Authorization: Bearer eyJhbGci...
         "environment": "STAGING",
         "status": "SUCCESSFUL",
         "deployedBy": "devops2",
-        "startTime": "2025-07-12T14:22:00Z",
-        "endTime": "2025-07-12T14:35:10Z",
+        "startTime": "2026-07-12T14:22:00Z",
+        "endTime": "2026-07-12T14:35:10Z",
         "remarks": null,
         "durationSeconds": 790
       }
@@ -402,7 +406,7 @@ Authorization: Bearer eyJhbGci...
     "totalPages": 5,
     "last": false
   },
-  "timestamp": "2025-07-13T10:30:00Z",
+  "timestamp": "2026-07-13T10:30:00Z",
   "errors": null
 }
 ```
@@ -456,12 +460,12 @@ Authorization: Bearer eyJhbGci...
     "environment": "STAGING",
     "status": "PENDING",
     "deployedBy": "devops1",
-    "startTime": "2025-07-13T10:30:00Z",
+    "startTime": "2026-07-13T10:30:00Z",
     "endTime": null,
     "remarks": "Release candidate — all integration tests passing",
     "durationSeconds": null
   },
-  "timestamp": "2025-07-13T10:30:00Z",
+  "timestamp": "2026-07-13T10:30:00Z",
   "errors": null
 }
 ```
@@ -510,12 +514,12 @@ Authorization: Bearer eyJhbGci...
     "environment": "STAGING",
     "status": "BUILDING",
     "deployedBy": "devops1",
-    "startTime": "2025-07-13T10:30:00Z",
+    "startTime": "2026-07-13T10:30:00Z",
     "endTime": null,
     "remarks": "Release candidate — all integration tests passing",
     "durationSeconds": null
   },
-  "timestamp": "2025-07-13T10:35:00Z",
+  "timestamp": "2026-07-13T10:35:00Z",
   "errors": null
 }
 ```
@@ -570,12 +574,12 @@ Authorization: Bearer eyJhbGci...
     "environment": "STAGING",
     "status": "BUILDING",
     "deployedBy": "devops1",
-    "startTime": "2025-07-13T10:30:00Z",
+    "startTime": "2026-07-13T10:30:00Z",
     "endTime": null,
     "remarks": "Updated: hotfix for payment timeout included in this build",
     "durationSeconds": null
   },
-  "timestamp": "2025-07-13T10:40:00Z",
+  "timestamp": "2026-07-13T10:40:00Z",
   "errors": null
 }
 ```
@@ -677,12 +681,12 @@ No response body.
     "environment": "STAGING",
     "status": "BUILDING",
     "deployedBy": "devops1",
-    "startTime": "2025-07-13T10:30:00Z",
+    "startTime": "2026-07-13T10:30:00Z",
     "endTime": null,
     "remarks": "Release candidate — all integration tests passing",
     "durationSeconds": null
   },
-  "timestamp": "2025-07-13T10:32:00Z",
+  "timestamp": "2026-07-13T10:32:00Z",
   "errors": null
 }
 ```
@@ -738,9 +742,9 @@ No response body.
     "deploymentId": 105,
     "previousVersion": "1.4.2",
     "rollbackReason": "Critical bug in payment processing — charge duplication under high load",
-    "rollbackTime": "2025-07-13T11:05:00Z"
+    "rollbackTime": "2026-07-13T11:05:00Z"
   },
-  "timestamp": "2025-07-13T11:05:00Z",
+  "timestamp": "2026-07-13T11:05:00Z",
   "errors": null
 }
 ```
@@ -799,7 +803,7 @@ Authorization: Bearer eyJhbGci...
         "deploymentId": 105,
         "previousVersion": "1.4.2",
         "rollbackReason": "Critical bug in payment processing — charge duplication under high load",
-        "rollbackTime": "2025-07-13T11:05:00Z"
+        "rollbackTime": "2026-07-13T11:05:00Z"
       }
     ],
     "page": 0,
@@ -808,7 +812,7 @@ Authorization: Bearer eyJhbGci...
     "totalPages": 1,
     "last": true
   },
-  "timestamp": "2025-07-13T11:10:00Z",
+  "timestamp": "2026-07-13T11:10:00Z",
   "errors": null
 }
 ```
@@ -864,8 +868,8 @@ Authorization: Bearer eyJhbGci...
         "environment": "PRODUCTION",
         "status": "SUCCESSFUL",
         "deployedBy": "admin",
-        "startTime": "2025-07-13T10:00:00Z",
-        "endTime": "2025-07-13T10:11:22Z",
+        "startTime": "2026-07-13T10:00:00Z",
+        "endTime": "2026-07-13T10:11:22Z",
         "remarks": null,
         "durationSeconds": 682
       },
@@ -876,8 +880,8 @@ Authorization: Bearer eyJhbGci...
         "environment": "STAGING",
         "status": "ROLLED_BACK",
         "deployedBy": "devops1",
-        "startTime": "2025-07-13T09:30:00Z",
-        "endTime": "2025-07-13T11:05:00Z",
+        "startTime": "2026-07-13T09:30:00Z",
+        "endTime": "2026-07-13T11:05:00Z",
         "remarks": null,
         "durationSeconds": 5700
       },
@@ -888,7 +892,7 @@ Authorization: Bearer eyJhbGci...
         "environment": "QA",
         "status": "TESTING",
         "deployedBy": "devops2",
-        "startTime": "2025-07-13T09:00:00Z",
+        "startTime": "2026-07-13T09:00:00Z",
         "endTime": null,
         "remarks": "Full regression suite",
         "durationSeconds": null
@@ -900,8 +904,8 @@ Authorization: Bearer eyJhbGci...
         "environment": "DEV",
         "status": "FAILED",
         "deployedBy": "devops3",
-        "startTime": "2025-07-13T08:45:00Z",
-        "endTime": "2025-07-13T08:50:12Z",
+        "startTime": "2026-07-13T08:45:00Z",
+        "endTime": "2026-07-13T08:50:12Z",
         "remarks": null,
         "durationSeconds": 312
       },
@@ -912,14 +916,14 @@ Authorization: Bearer eyJhbGci...
         "environment": "PRODUCTION",
         "status": "SUCCESSFUL",
         "deployedBy": "admin",
-        "startTime": "2025-07-12T22:00:00Z",
-        "endTime": "2025-07-12T22:09:55Z",
+        "startTime": "2026-07-12T22:00:00Z",
+        "endTime": "2026-07-12T22:09:55Z",
         "remarks": "Monthly reporting update",
         "durationSeconds": 595
       }
     ]
   },
-  "timestamp": "2025-07-13T10:30:00Z",
+  "timestamp": "2026-07-13T10:30:00Z",
   "errors": null
 }
 ```
@@ -957,10 +961,12 @@ Authorization: Bearer eyJhbGci...
     "successRate": 87.5,
     "totalEvaluated": 40
   },
-  "timestamp": "2025-07-13T10:30:00Z",
+  "timestamp": "2026-07-13T10:30:00Z",
   "errors": null
 }
 ```
+
+The `data` field maps to the `SuccessRateResponse` DTO.
 
 | Field | Type | Description |
 |---|---|---|
@@ -1004,8 +1010,8 @@ Authorization: Bearer eyJhbGci...
       "environment": "PRODUCTION",
       "status": "SUCCESSFUL",
       "deployedBy": "admin",
-      "startTime": "2025-07-13T10:00:00Z",
-      "endTime": "2025-07-13T10:11:22Z",
+      "startTime": "2026-07-13T10:00:00Z",
+      "endTime": "2026-07-13T10:11:22Z",
       "remarks": null,
       "durationSeconds": 682
     },
@@ -1016,13 +1022,13 @@ Authorization: Bearer eyJhbGci...
       "environment": "STAGING",
       "status": "ROLLED_BACK",
       "deployedBy": "devops1",
-      "startTime": "2025-07-13T09:30:00Z",
-      "endTime": "2025-07-13T11:05:00Z",
+      "startTime": "2026-07-13T09:30:00Z",
+      "endTime": "2026-07-13T11:05:00Z",
       "remarks": null,
       "durationSeconds": 5700
     }
   ],
-  "timestamp": "2025-07-13T10:30:00Z",
+  "timestamp": "2026-07-13T10:30:00Z",
   "errors": null
 }
 ```
@@ -1077,21 +1083,21 @@ Authorization: Bearer eyJhbGci...
         "username": "admin",
         "email": "admin@company.com",
         "role": "ADMIN",
-        "createdAt": "2025-01-01T09:00:00Z"
+        "createdAt": "2026-01-01T09:00:00Z"
       },
       {
         "id": 2,
         "username": "devops1",
         "email": "devops@company.com",
         "role": "DEVOPS_ENGINEER",
-        "createdAt": "2025-07-13T10:30:00Z"
+        "createdAt": "2026-07-13T10:30:00Z"
       },
       {
         "id": 3,
         "username": "dev1",
         "email": "dev1@company.com",
         "role": "DEVELOPER",
-        "createdAt": "2025-07-10T14:00:00Z"
+        "createdAt": "2026-07-10T14:00:00Z"
       }
     ],
     "page": 0,
@@ -1100,7 +1106,7 @@ Authorization: Bearer eyJhbGci...
     "totalPages": 1,
     "last": true
   },
-  "timestamp": "2025-07-13T10:30:00Z",
+  "timestamp": "2026-07-13T10:30:00Z",
   "errors": null
 }
 ```
@@ -1146,9 +1152,9 @@ Authorization: Bearer eyJhbGci...
     "username": "devops1",
     "email": "devops@company.com",
     "role": "DEVOPS_ENGINEER",
-    "createdAt": "2025-07-13T10:30:00Z"
+    "createdAt": "2026-07-13T10:30:00Z"
   },
-  "timestamp": "2025-07-13T10:30:00Z",
+  "timestamp": "2026-07-13T10:30:00Z",
   "errors": null
 }
 ```
@@ -1202,9 +1208,9 @@ Authorization: Bearer eyJhbGci...
     "username": "dev1",
     "email": "dev1@company.com",
     "role": "DEVOPS_ENGINEER",
-    "createdAt": "2025-07-10T14:00:00Z"
+    "createdAt": "2026-07-10T14:00:00Z"
   },
-  "timestamp": "2025-07-13T10:30:00Z",
+  "timestamp": "2026-07-13T10:30:00Z",
   "errors": null
 }
 ```
@@ -1253,6 +1259,8 @@ No response body.
 | 403 Forbidden | Authenticated user is not an ADMIN |
 | 404 Not Found | No user exists with the given `id` |
 
+> **Note:** Self-deletion and deletion of the last ADMIN are not restricted in v1. System administrators should manually ensure at least one ADMIN account exists.
+
 ---
 
 ### 5.5 Audit Log Endpoints
@@ -1276,8 +1284,8 @@ No response body.
 | `sort` | string | No (default: `timestamp,desc`) | Sort field and direction |
 | `username` | string | No | Exact match on `username` field |
 | `action` | string | No | Exact match on `action` field (e.g. `DEPLOYMENT_CREATED`) |
-| `startDate` | ISO-8601 datetime | No | Inclusive lower bound on `timestamp` (e.g. `2025-07-01T00:00:00`) |
-| `endDate` | ISO-8601 datetime | No | Inclusive upper bound on `timestamp` (e.g. `2025-07-13T23:59:59`) |
+| `startDate` | ISO-8601 datetime | No | Inclusive lower bound on `timestamp` (e.g. `2026-07-01T00:00:00`) |
+| `endDate` | ISO-8601 datetime | No | Inclusive upper bound on `timestamp` (e.g. `2026-07-13T23:59:59`) |
 
 **Example request:**
 
@@ -1298,14 +1306,14 @@ Authorization: Bearer eyJhbGci...
         "id": 501,
         "username": "devops1",
         "action": "DEPLOYMENT_CREATED",
-        "timestamp": "2025-07-13T10:30:00Z",
+        "timestamp": "2026-07-13T10:30:00Z",
         "description": "Deployment created: payment-service v1.4.2 to STAGING"
       },
       {
         "id": 499,
         "username": "devops1",
         "action": "DEPLOYMENT_CREATED",
-        "timestamp": "2025-07-12T09:15:00Z",
+        "timestamp": "2026-07-12T09:15:00Z",
         "description": "Deployment created: auth-service v2.1.0 to QA"
       }
     ],
@@ -1315,7 +1323,7 @@ Authorization: Bearer eyJhbGci...
     "totalPages": 1,
     "last": true
   },
-  "timestamp": "2025-07-13T10:30:00Z",
+  "timestamp": "2026-07-13T10:30:00Z",
   "errors": null
 }
 ```
@@ -1355,7 +1363,7 @@ Authorization: Bearer eyJhbGci...
 | `projectName` | string | — | `GET /api/deployments` | Case-insensitive partial match (`LIKE '%value%'`) on `project_name` column |
 | `startDate` | date (`YYYY-MM-DD`) | — | `GET /api/deployments` | Inclusive lower bound on `startTime`; matches from start of given date |
 | `endDate` | date (`YYYY-MM-DD`) | — | `GET /api/deployments` | Inclusive upper bound on `startTime`; matches through end of given date |
-| `startDate` | ISO-8601 datetime | — | `GET /api/audit-logs` | Inclusive lower bound on `timestamp` (e.g. `2025-07-01T00:00:00`) |
-| `endDate` | ISO-8601 datetime | — | `GET /api/audit-logs` | Inclusive upper bound on `timestamp` (e.g. `2025-07-13T23:59:59`) |
+| `startDate` | ISO-8601 datetime | — | `GET /api/audit-logs` | Inclusive lower bound on `timestamp` (e.g. `2026-07-01T00:00:00`) |
+| `endDate` | ISO-8601 datetime | — | `GET /api/audit-logs` | Inclusive upper bound on `timestamp` (e.g. `2026-07-13T23:59:59`) |
 | `username` | string | — | `GET /api/audit-logs` | Exact match (case-sensitive) on `username` field |
 | `action` | string | — | `GET /api/audit-logs` | Exact match on `action` field constant (e.g. `LOGIN_SUCCESS`) |
