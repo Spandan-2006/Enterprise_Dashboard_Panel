@@ -42,6 +42,8 @@ Enterprise_Dashboard_Panel/
 
 All backend commands are run from the project root. The Gradle wrapper (`./gradlew`) is included — no separate Gradle installation is required.
 
+> **Windows note:** On Windows Command Prompt, replace `./gradlew` with `gradlew.bat` in the commands below.
+
 | Command | What it does |
 |---|---|
 | `./gradlew build` | Compile all sources, run all tests, and package the JAR |
@@ -82,6 +84,7 @@ com.enterprise.dashboard
 ├── controller/        # @RestController classes — HTTP boundary only
 ├── service/           # @Service classes — all business logic
 ├── repository/        # @Repository interfaces extending JpaRepository
+├── mapper/            # MapStruct or manual mappers — entity ↔ DTO conversion
 ├── model/
 │   ├── entity/        # @Entity classes mapped to database tables
 │   ├── dto/           # Request and response DTOs (records or plain classes)
@@ -115,7 +118,12 @@ Represents the lifecycle state of a deployment.
 | `ROLLED_BACK` | A rollback was performed after a failed deployment |
 
 Valid forward transitions: `PENDING → BUILDING → TESTING → DEPLOYING → SUCCESSFUL`.
-Failure path: `DEPLOYING → FAILED → ROLLED_BACK`.
+Failure path:
+```
+PENDING → BUILDING → TESTING → DEPLOYING → SUCCESSFUL
+              ↓           ↓          ↓
+            FAILED      FAILED    FAILED → ROLLED_BACK
+```
 
 ### `Environment`
 
@@ -124,6 +132,7 @@ Represents the target deployment environment.
 | Value | Notes |
 |---|---|
 | `DEV` | Developer sandbox; no approval required |
+| `QA` | Quality assurance environment; requires DEVOPS_ENGINEER or ADMIN role |
 | `STAGING` | Pre-production mirror; requires DEVOPS_ENGINEER or ADMIN role |
 | `PRODUCTION` | Live environment; requires ADMIN role |
 
@@ -156,7 +165,7 @@ These rules are non-negotiable. Any code that violates them must not be merged.
 
 - **Never log passwords, tokens, or PII.** This includes debug-level log statements. Scrub or mask sensitive fields before logging.
 - **The JWT signing secret must always come from the `JWT_SECRET` environment variable.** It must never be hardcoded in source code, `application.yml`, or any committed configuration file.
-- **All endpoints except `/api/auth/**` and `/swagger-ui/**` require authentication.** The Spring Security configuration must enforce this at the filter chain level; do not rely solely on `@PreAuthorize` for public endpoints.
+- **All endpoints except `/api/auth/**`, `/swagger-ui/**`, and `/actuator/health` require authentication.** The Spring Security configuration must enforce this at the filter chain level; do not rely solely on `@PreAuthorize` for public endpoints.
 - Passwords must always be hashed with BCrypt before persistence. Never store or compare plaintext passwords.
 - CORS must be explicitly configured; do not use a wildcard origin (`*`) in `staging` or `production` profiles.
 - Validate all user-supplied input using Jakarta Bean Validation annotations (`@NotBlank`, `@Size`, etc.) on DTO fields. The global `@ControllerAdvice` handler catches `MethodArgumentNotValidException` and returns a structured error response.

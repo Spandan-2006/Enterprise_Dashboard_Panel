@@ -1,4 +1,4 @@
-![Build Status](https://github.com/your-org/Enterprise_Dashboard_Panel/actions/workflows/ci.yml/badge.svg)
+![Build Status](https://github.com/Spandan-2006/Enterprise_Dashboard_Panel/actions/workflows/ci.yml/badge.svg)
 ![Java 21](https://img.shields.io/badge/Java-21-blue?logo=openjdk)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.x-brightgreen?logo=springboot)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue?logo=postgresql)
@@ -89,7 +89,7 @@ The application follows a strict layered (clean) architecture. Each layer has a 
 ### Clone the Repository
 
 ```bash
-git clone https://github.com/your-org/Enterprise_Dashboard_Panel.git
+git clone https://github.com/Spandan-2006/Enterprise_Dashboard_Panel.git
 cd Enterprise_Dashboard_Panel
 ```
 
@@ -100,6 +100,8 @@ docker-compose up --build
 ```
 
 This starts the Spring Boot application and a PostgreSQL 16 container. The database schema is applied automatically on first start.
+
+To run tests without Docker: `./gradlew test`
 
 ### Verify the Application is Running
 
@@ -113,7 +115,7 @@ curl http://localhost:8080/actuator/health
 Open the Swagger UI in your browser:
 
 ```
-http://localhost:8080/swagger-ui.html
+http://localhost:8080/swagger-ui/index.html
 ```
 
 ---
