@@ -4,60 +4,67 @@ This file gives AI coding agents the orientation needed to work effectively in t
 
 ---
 
-## Repository Orientation
+## Documentation Map
 
-### Folder Layout
+Start here before writing any code. These six files contain the complete project specification.
+
+| File | Purpose |
+|------|---------|
+| [docs/PRD.md](docs/PRD.md) | Product requirements — user stories, functional requirements, success metrics |
+| [docs/TRD.md](docs/TRD.md) | Technical requirements — tech stack, architecture, security, environments, testing |
+| [docs/APP_FLOW.md](docs/APP_FLOW.md) | User flows, route structure, deployment state machine |
+| [docs/UI_UX_BRIEF.md](docs/UI_UX_BRIEF.md) | React component hierarchy, status badge design, API layer, responsive layout |
+| [docs/BACKEND_SCHEMA.md](docs/BACKEND_SCHEMA.md) | DB schema (SQL), JPA entities, DTOs, service interfaces, full API contract |
+| [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) | Phased build order, coding standards, git workflow, definition of done |
+
+---
+
+## Repository Layout
 
 ```
 Enterprise_Dashboard_Panel/
 ├── src/
 │   ├── main/
 │   │   ├── java/com/enterprise/dashboard/   # All backend Java source code
-│   │   └── resources/                        # application.yml, static assets, migrations
+│   │   └── resources/
+│   │       ├── application.yml               # Shared config + profile placeholders
+│   │       ├── application-dev.yml
+│   │       ├── application-test.yml
+│   │       └── db/migration/                 # Flyway V1–V6 migration scripts
 │   └── test/
-│       └── java/com/enterprise/dashboard/   # Unit and integration tests (mirrors main structure)
-├── frontend/                                 # Optional React 18 frontend (may not exist yet)
+│       └── java/com/enterprise/dashboard/   # Mirrors main package structure
+├── frontend/                                 # Optional React 18 frontend
 │   ├── src/
-│   ├── public/
 │   └── package.json
-├── docker/                                   # Dockerfile, docker-compose overrides, init scripts
-├── docs/                                     # All project documentation (see README Quick Links)
-│   └── ADR/                                  # Architecture Decision Records
-├── .github/
-│   └── workflows/                            # GitHub Actions CI/CD pipeline definitions
-├── build.gradle                              # Gradle build script
-├── settings.gradle                           # Gradle project settings
-├── docker-compose.yml                        # Full-stack local environment
+├── docker/                                   # Dockerfile, Docker Compose overrides
+├── docs/                                     # Six project spec documents (see above)
+├── .github/workflows/                        # GitHub Actions CI/CD pipeline
+├── build.gradle.kts                          # Gradle Kotlin DSL build script
+├── docker-compose.yml
 ├── AGENTS.md                                 # This file
-└── README.md                                 # Human-facing project overview
+└── README.md
 ```
-
-### Primary Language
-
-**Java 21** (backend). The optional frontend is **TypeScript/JavaScript** (React 18).
 
 ---
 
-## Build and Run Commands
+## Build & Run Commands
 
-All backend commands are run from the project root. The Gradle wrapper (`./gradlew`) is included — no separate Gradle installation is required.
-
-> **Windows note:** On Windows Command Prompt, replace `./gradlew` with `gradlew.bat` in the commands below.
+> **Windows note:** Replace `./gradlew` with `gradlew.bat` on Windows Command Prompt.
 
 | Command | What it does |
-|---|---|
-| `./gradlew build` | Compile all sources, run all tests, and package the JAR |
+|---------|-------------|
+| `./gradlew build` | Compile, test, coverage check, package JAR |
 | `./gradlew test` | Run all unit and integration tests |
-| `./gradlew bootRun` | Start the Spring Boot application locally (requires a running PostgreSQL instance) |
-| `docker-compose up --build` | Build the Docker image and start the full stack (app + PostgreSQL) |
-| `docker-compose down -v` | Stop and remove all containers, networks, and named volumes |
+| `./gradlew test jacocoTestCoverageVerification` | Tests + enforce ≥ 80% line coverage (fails build if below) |
+| `./gradlew bootRun` | Start Spring Boot app (requires running PostgreSQL) |
+| `docker-compose up --build` | Build Docker image + start full stack (app + PostgreSQL 15) |
+| `docker-compose down -v` | Stop and remove all containers and volumes |
 
-Frontend commands (run from the `frontend/` directory):
+Frontend commands (from `frontend/` directory):
 
 ```bash
-cd frontend
 npm install
-npm run dev    # Start the Vite dev server (hot-reload)
+npm run dev    # Vite dev server with HMR
 npm run build  # Production build to frontend/dist/
 ```
 
@@ -65,118 +72,106 @@ npm run build  # Production build to frontend/dist/
 
 ## Architecture Rules
 
-Agents must follow these rules when writing or modifying code. Violations will be caught in code review and must be corrected before merge.
+Violations will be caught in code review and must be corrected before merge.
 
-1. **Controllers must never contain business logic** — delegate everything beyond request parsing and response formatting to a service class.
-2. **Services must never directly query the database** — delegate all persistence operations to repository interfaces.
-3. **All API responses must use the standard `ApiResponse<T>` wrapper** — never return a bare entity, list, or primitive from a controller method.
-4. **DTOs must be used at the controller boundary; entities must not be serialized directly** — map entities to DTOs in the service layer before returning them to controllers.
-5. **All new endpoints must have a corresponding JUnit 5 test** — use `@WebMvcTest` for controller slice tests or `@SpringBootTest` for integration tests; both are acceptable, but coverage is required.
+1. **Controllers contain zero business logic** — delegate everything beyond request parsing and response formatting to a `@Service` class
+2. **Services never call repositories from other services' domains** — `DeploymentService` does not call `UserRepository` directly
+3. **All API responses use `ApiResponse<T>`** — never return a bare entity, list, or primitive from a controller method
+4. **Entities never cross the service boundary** — map to DTOs before returning from any service method
+5. **Every new endpoint needs tests** — minimum: no token → 401, wrong role → 403, correct role → 2xx, expired token → 401
 
 ---
 
 ## Package Structure
 
-All Java source lives under the base package `com.enterprise.dashboard`. The sub-package layout is:
-
 ```
 com.enterprise.dashboard
-├── controller/        # @RestController classes — HTTP boundary only
-├── service/           # @Service classes — all business logic
-├── repository/        # @Repository interfaces extending JpaRepository
-├── mapper/            # MapStruct or manual mappers — entity ↔ DTO conversion
+├── controller/    — @RestController (HTTP boundary only)
+├── service/       — @Service interfaces + impl/ subpackage (all business logic)
+├── repository/    — @Repository interfaces extending JpaRepository
+├── mapper/        — entity ↔ DTO mappers
 ├── model/
-│   ├── entity/        # @Entity classes mapped to database tables
-│   ├── dto/           # Request and response DTOs (records or plain classes)
-│   └── enums/         # Domain enumerations (DeploymentStatus, Environment, Role)
-├── security/          # JWT filter, UserDetailsService impl, security config
-├── config/            # Spring @Configuration classes (CORS, Swagger, beans)
-├── exception/         # Custom exception classes and @ControllerAdvice handler
-└── audit/             # Audit log entity, service, and event listeners
+│   ├── entity/    — @Entity classes
+│   ├── dto/       — request + response DTOs
+│   └── enums/     — Role, Environment, DeploymentStatus
+├── security/      — JwtAuthFilter, CustomUserDetailsService, SecurityConfig, JwtUtil
+├── config/        — CORS, Swagger, other @Configuration beans
+├── exception/     — AppException hierarchy, GlobalExceptionHandler
+└── audit/         — AuditLog entity, AuditService, AuditActions constants
 ```
 
-When adding a new feature, create files in the appropriate sub-packages above. Do not create top-level packages outside this structure without an ADR.
+Do not create top-level packages outside this structure.
 
 ---
 
 ## Key Enumerations
 
-These enums are defined in `com.enterprise.dashboard.model.enums`. Use them — do not use raw strings to represent these concepts anywhere in the codebase.
+Package: `com.enterprise.dashboard.model.enums`. Use these — never raw strings.
 
 ### `DeploymentStatus`
 
-Represents the lifecycle state of a deployment.
-
 | Value | Meaning |
-|---|---|
-| `PENDING` | Deployment has been created but not yet started |
-| `BUILDING` | Artifact build is in progress |
-| `TESTING` | Automated tests are running against the built artifact |
-| `DEPLOYING` | Artifact is being pushed to the target environment |
-| `SUCCESSFUL` | Deployment completed without errors |
-| `FAILED` | Deployment encountered a terminal error |
-| `ROLLED_BACK` | A rollback was performed after a failed deployment |
+|-------|---------|
+| `PENDING` | Created, not yet started |
+| `BUILDING` | Artifact build in progress |
+| `TESTING` | Automated tests running |
+| `DEPLOYING` | Artifact being pushed to environment |
+| `SUCCESSFUL` | Completed without errors (terminal) |
+| `FAILED` | Terminal error (terminal) |
+| `ROLLED_BACK` | Rollback performed after failure (terminal) |
 
-Valid forward transitions: `PENDING → BUILDING → TESTING → DEPLOYING → SUCCESSFUL`.
-Failure path:
 ```
 PENDING → BUILDING → TESTING → DEPLOYING → SUCCESSFUL
-              ↓           ↓          ↓
-            FAILED      FAILED    FAILED → ROLLED_BACK
+    ↓          ↓         ↓          ↓
+  FAILED    FAILED    FAILED    FAILED → ROLLED_BACK (via rollback endpoint only)
 ```
 
 ### `Environment`
 
-Represents the target deployment environment.
-
-| Value | Notes |
-|---|---|
-| `DEV` | Developer sandbox; no approval required |
-| `QA` | Quality assurance environment; requires DEVOPS_ENGINEER or ADMIN role |
-| `STAGING` | Pre-production mirror; requires DEVOPS_ENGINEER or ADMIN role |
-| `PRODUCTION` | Live environment; requires ADMIN role |
+`DEV` | `QA` | `STAGING` | `PRODUCTION`
 
 ### `Role`
 
-Controls access to API endpoints via Spring Security.
+`ADMIN` | `DEVOPS_ENGINEER` | `DEVELOPER`
 
-| Value | Permissions summary |
-|---|---|
-| `ADMIN` | Full access to all endpoints including user management and environment configuration |
-| `DEVOPS_ENGINEER` | Can create, update, and rollback deployments; cannot manage users |
-| `DEVELOPER` | Read-only access to deployments; can create deployments to DEV only |
+Full authorization matrix → [docs/TRD.md](docs/TRD.md#authorization-matrix)
+
+---
+
+## Security Rules (Non-negotiable)
+
+- **Never log passwords, tokens, or PII.** Scrub sensitive fields before any log statement.
+- **JWT signing secret from `JWT_SECRET` env var only.** Never hardcoded in source or config files.
+- **All endpoints except `/api/auth/**`, `/swagger-ui/**`, `/v3/api-docs/**`, and `/actuator/health` require authentication.** Enforced at the `SecurityFilterChain` level, not only `@PreAuthorize`.
+- **BCrypt before any password persist.** Call `passwordEncoder.encode()` — never store or compare plaintext.
+- **CORS explicit.** No wildcard origin `*` in staging or production profiles.
+- **`@Valid` on all `@RequestBody` parameters.** The `GlobalExceptionHandler` catches `MethodArgumentNotValidException` and returns a structured 400 response.
 
 ---
 
 ## Testing Requirements
 
-- Every **service method** must have at least one **unit test** using JUnit 5 and Mockito. Mock all repository dependencies.
-- Every **controller endpoint** must have at least one test using `@WebMvcTest` (preferred for fast feedback) or `@SpringBootTest` (for integration scenarios).
-- The project enforces a minimum **80% line coverage** threshold via the JaCoCo Gradle plugin. The build will fail if coverage drops below this threshold.
-- Tests live in `src/test/java/` and mirror the package structure of the class under test.
-- Use `@DisplayName` on test methods to produce readable test reports.
-- Do not use `@SpringBootTest` when `@WebMvcTest` or `@DataJpaTest` slices are sufficient — full context startup is slow.
-
----
-
-## Security Rules
-
-These rules are non-negotiable. Any code that violates them must not be merged.
-
-- **Never log passwords, tokens, or PII.** This includes debug-level log statements. Scrub or mask sensitive fields before logging.
-- **The JWT signing secret must always come from the `JWT_SECRET` environment variable.** It must never be hardcoded in source code, `application.yml`, or any committed configuration file.
-- **All endpoints except `/api/auth/**`, `/swagger-ui/**`, and `/actuator/health` require authentication.** The Spring Security configuration must enforce this at the filter chain level; do not rely solely on `@PreAuthorize` for public endpoints.
-- Passwords must always be hashed with BCrypt before persistence. Never store or compare plaintext passwords.
-- CORS must be explicitly configured; do not use a wildcard origin (`*`) in `staging` or `production` profiles.
-- Validate all user-supplied input using Jakarta Bean Validation annotations (`@NotBlank`, `@Size`, etc.) on DTO fields. The global `@ControllerAdvice` handler catches `MethodArgumentNotValidException` and returns a structured error response.
+- Every **service method** → at least one **unit test** (`@ExtendWith(MockitoExtension.class)`; mock all repo dependencies)
+- Every **controller endpoint** → at least one integration test (`@SpringBootTest` + `@AutoConfigureMockMvc` for security tests; `@WebMvcTest` for fast slice tests)
+- **Minimum 80% line coverage** enforced by JaCoCo. Build fails below this threshold.
+- Tests live in `src/test/java/` and mirror the main package structure
+- Naming convention: `methodName_givenCondition_thenExpectedResult()`
+- Use `@DisplayName` for readable test reports
+- Use `UserTestBuilder` and `DeploymentTestBuilder` for test data
 
 ---
 
 ## Docs Maintenance Rules
 
-Keep documentation in sync with code changes. Specifically:
+Include documentation updates in the same PR as the code change.
 
-- **When adding or modifying an API endpoint**, update `docs/06-api-spec.md` with the new/changed path, method, request body, response body, and required role.
-- **When changing the database schema** (adding a table, column, index, or constraint), update `docs/07-database.md` and add the corresponding Flyway migration script under `src/main/resources/db/migration/`.
-- **When making a significant architectural decision** (new framework, design pattern, data store, or deviation from existing conventions), create a new ADR under `docs/ADR/` following the existing naming convention (`ADR-NNN-short-title.md`). An ADR should document: context, decision, consequences, and alternatives considered.
-- Documentation updates must be included in the same pull request as the code change they describe. PRs that change behavior without updating relevant docs will be blocked in review.
+| Code Change | Required Doc Update |
+|-------------|-------------------|
+| New or modified API endpoint | `docs/BACKEND_SCHEMA.md` — endpoint catalog + DTOs |
+| New or modified DB schema | `docs/BACKEND_SCHEMA.md` — table definitions + add Flyway migration |
+| New user flow or state | `docs/APP_FLOW.md` |
+| New frontend page or component | `docs/UI_UX_BRIEF.md` |
+| New environment variable | `docs/TRD.md` — environment variables table |
+| Significant architectural decision | Create ADR under `docs/ADR/` (format: `ADR-NNN-short-title.md`) |
+
+PRs that change behavior without updating relevant docs will be blocked in review.
